@@ -1,28 +1,25 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { fetchMovies, fetchRandomMovies } from "$lib/api/movies.js";
+  import { createEventDispatcher } from "svelte";
   import type { Movie } from "$lib/types/movie.js";
   import Button from "./Button.svelte";
 
   export let query = 'Batman'
+  export let movies: Movie[] = []
+  export let mode: 'browse' | 'favourites' = 'browse'
 
-  let movies: Movie[] = []
-  let error = null
-  let loading = true
-  
-  async function loadMovies() {
-    loading = true
-    error = null
+  // Logic for adding and removing favourite movies
+  const dispatch = createEventDispatcher<{
+    add: Movie
+    remove: string
+  }>()
 
-    try {
-      movies = await fetchRandomMovies()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load movies'
-    } finally {
-      loading = false
-    }
+  function handleAdd(movie: Movie) {
+    dispatch('add', movie)
   }
-  onMount(loadMovies)
+
+  function handleRemove(imdbID: string) {
+    dispatch('remove', imdbID)
+  }
 
 
   // Drag & Scroll behaviour
@@ -96,34 +93,40 @@
     }
   }
 </script>
-
-{#if loading}
-  <p class='loading'>Loading...</p>
-{:else if error}
-  <p class='error'>{error}</p>
-{:else}
-  <Button text='Refresh' on:click={loadMovies}></Button>
-  <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    class="carousel"
-    bind:this={carousel}
-    role="region"
-    aria-label="Movie carousel"
-    aria-roledescription="carousel"
-    tabindex="0"
-    on:wheel={onWheel}
-    on:mousedown={onMouseDown}
-    on:touchstart={onTouchStart}
-    on:keydown={onKeyDown}
-  >
-    {#each movies as movie}
-      <div class='card'>
-        <img src={movie.Poster != 'N/A' ? movie.Poster : '/placeholder.png'} alt={movie.Title}>
+<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+  class="carousel"
+  bind:this={carousel}
+  role="region"
+  aria-label="Movie carousel"
+  aria-roledescription="carousel"
+  tabindex="0"
+  on:wheel={onWheel}
+  on:mousedown={onMouseDown}
+  on:touchstart={onTouchStart}
+  on:keydown={onKeyDown}
+>
+  {#each movies as movie}
+    <div class='card'>
+      <img src={movie.Poster != 'N/A' ? movie.Poster : '/placeholder.png'} alt={movie.Title}>
+      <div class='action-btn'>
+        <Button
+          text={mode === 'browse' ? '❤️ Add' : '❌ Remove'}
+          on:click={() =>
+            mode === 'browse'
+              ? handleAdd(movie)
+              : handleRemove(movie.imdbID)
+          }
+        >
+        </Button>
       </div>
-    {/each}
-  </div>
-{/if}
+    </div>
+  {/each}
+</div>
+
+
+
 
 <style>
   .carousel {
@@ -157,10 +160,27 @@
     transition: transform 0.2s;
     flex-shrink: 0;
     user-select: none;
+    position: relative;
+  }
+
+
+  .action-btn {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    opacity: 0;
+    transition: opacity 0.5s ease, visibility 0.5s;
+    transition-delay: 1s;
   }
 
   .card:hover {
     transform: scale(1.05);
+
+    .action-btn {
+      visibility: visible;
+      opacity: 1;
+      transition-delay: .5s;
+    }
   }
 
   img {
