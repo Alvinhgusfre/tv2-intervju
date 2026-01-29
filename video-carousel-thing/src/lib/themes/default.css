@@ -1,0 +1,12 @@
+:root {
+  /* Fonts */
+  --font-sans: 'Helvetica' 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+
+  --color-base: #100118;
+  --color-base-on-text: #fafafa;
+
+  --color-primary: #3a2f5c;
+  --color-primary-hover: #655b88;
+ 
+}
