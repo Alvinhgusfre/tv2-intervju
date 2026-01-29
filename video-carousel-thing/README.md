@@ -1,3 +1,21 @@
+# Setup
+
+1) Make sure you have node install and updated
+
+2) Run
+```bash
+pnpm install
+```
+3) create a .env file in the root folder (video-carousel-thing)
+
+4) Add the variable OMDB_API_KEY=yourKey
+
+5) 
+```bash
+pnpm run dev
+```
+
+
 # create-svelte
 
 Everything you need to build a Svelte library, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
