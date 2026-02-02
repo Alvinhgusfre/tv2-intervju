@@ -17,19 +17,24 @@
 </div>
 
 <style>
-  .container {
+  main {
     margin: 0 8rem;
-  }
-  @media (max-width: 600px) {
-    .container {
-      margin: 0 1rem;
-    }
   }
   header {
     min-height: 3em;
+    background: var(--color-primary);
+    width: 100%;
   }
-  h1 {
-    margin: 0;
+  header h1 {
+    margin: 0 8rem;
     padding: .5em 0;
+  }
+  @media (max-width: 600px) {
+    main {
+      margin: 0 1rem;
+    }
+    header h1 {
+      margin: 0 1rem;
+    }
   }
 </style>

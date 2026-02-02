@@ -2,10 +2,15 @@
   import { createEventDispatcher } from "svelte"; // Not actually deprecated
   import type { Movie } from "$lib/types/movie.js";
   import Button from "./Button.svelte";
+  import { onMount } from "svelte";
 
   // export let query = 'Batman'
   export let movies: Movie[] = []
   export let mode: 'browse' | 'favourites' = 'browse'
+
+  onMount(() => {
+    updateArrows()
+  })
 
   // Logic for adding and removing favourite movies
   const dispatch = createEventDispatcher<{
@@ -25,124 +30,125 @@
   // Drag & Scroll behaviour
   let carousel: HTMLDivElement
 
+  let isDown = false
   let isDragging = false
   let startX = 0
   let scrollStart = 0
-  let velocity = 0
-  let rafId = 0
 
-  const friction = 1.5
+  const DRAG_THRESHOLD = 6
 
-  function onPointerDown(e: PointerEvent) {
-    if ((e.target as HTMLElement).closest('button')) return
-    isDragging = true
-    startX = e.clientX
-    scrollStart = carousel.scrollLeft
-    velocity = 0
-
-    carousel.setPointerCapture(e.pointerId)
-    cancelAnimationFrame(rafId)
-  }
-
-  function onPointerMove(e: PointerEvent) {
-    if (!isDragging) return
-
-    const dx = e.clientX - startX
-    const prev = carousel.scrollLeft
-
-    carousel.scrollLeft = scrollStart - dx
-    velocity = carousel.scrollLeft - prev
-  }
-
-  function releasePointer(e: PointerEvent) {
-    if (!isDragging) return
-
+  function pointerDown(e: PointerEvent) {
+    isDown = true
     isDragging = false
 
-    try {
-      carousel.releasePointerCapture(e.pointerId)
-    } catch {}
-
-    applyMomentum()
+    startX = e.clientX
+    scrollStart = carousel.scrollLeft
   }
 
-  function applyMomentum() {
-    function frame() {
-      velocity *= friction
-      carousel.scrollLeft += velocity
+  function pointerMove(e: PointerEvent) {
+    if (!isDown) return
 
-      if (Math.abs(velocity) > 0.5) {
-        rafId = requestAnimationFrame(frame)
-      } else {
-        snapToCard()
-      }
+    const dx = e.clientX - startX
+
+    // Only start dragging after threshold
+    if (!isDragging && Math.abs(dx) > DRAG_THRESHOLD) {
+      isDragging = true
+      carousel.setPointerCapture(e.pointerId)
+      carousel.classList.add('dragging')
     }
 
-    rafId = requestAnimationFrame(frame)
+    if (!isDragging) return
+
+    carousel.scrollLeft = scrollStart - dx
   }
 
-  function snapToCard() {
+  function pointerUp(e: PointerEvent) {
+    if (isDragging) {
+      try {
+        carousel.releasePointerCapture(e.pointerId)
+      } catch {}
+    }
+
+    isDown = false
+    isDragging = false
+    carousel.classList.remove('dragging')
+  }
+
+  // Arrow logic
+  let canScrollLeft = false
+  let canScrollRight = true
+
+  function updateArrows() {
+    if (!carousel) return
+
+    canScrollLeft = carousel.scrollLeft > 5
+    canScrollRight =
+      carousel.scrollLeft + carousel.clientWidth <
+      carousel.scrollWidth - 5
+  }
+
+  function scrollByCard(direction: 'left' | 'right') {
     const card = carousel.querySelector('.card') as HTMLElement
     if (!card) return
 
     const gap = parseFloat(getComputedStyle(carousel).gap || '0')
-    const cardWidth = card.offsetWidth + gap
+    const amount = card.offsetWidth + gap
 
-    const index = Math.round(carousel.scrollLeft / cardWidth)
-
-    carousel.scrollTo({
-      left: index * cardWidth,
+    carousel.scrollBy({
+      left: direction === 'left' ? -amount : amount,
       behavior: 'smooth'
     })
   }
-
-  function onWheelNative(e: WheelEvent) {
-    e.preventDefault()
-    carousel.scrollLeft += e.deltaY
-  }
-
-  // Attach non-passive wheel listener
-  function setupWheel(node: HTMLElement) {
-    const handler = (e: WheelEvent) => onWheelNative(e)
-
-    node.addEventListener('wheel', handler, { passive: false })
-
-    return {
-      destroy() {
-        node.removeEventListener('wheel', handler)
-      }
-    }
-  }
 </script>
-<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div
-  class="carousel"
-  bind:this={carousel}
-  role="region"
-  aria-label="Movie carousel"
-  aria-roledescription="carousel"
-  tabindex="0"
-  on:pointerdown={onPointerDown}
-  on:pointermove={onPointerMove}
-  on:pointerup={releasePointer}
-  on:pointerleave={releasePointer}
-  on:pointercancel={releasePointer}
-  on:lostpointercapture={releasePointer}
-  use:setupWheel
->
-  {#each movies as movie}
-    <div class='card'>
-      <img src={movie.Poster != 'N/A' ? movie.Poster : '/placeholder.png'} alt={movie.Title}>
-      <div class='action-btn'>
-        <Button
-          text={mode === 'browse' ? '❤️ Add' : '❌ Remove'}
-          on:click={() => mode === 'browse' ? handleAdd(movie) : handleRemove(movie.imdbID)}
-        >
-        </Button>
+
+<div class="carousel-wrapper">
+  <button
+    class="arrow left"
+    on:click={() => scrollByCard('left')}
+    disabled={!canScrollLeft}
+    aria-label="Scroll left"
+  >
+    ◀
+  </button>
+
+  <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="carousel"
+    bind:this={carousel}
+    role="region"
+    aria-label="Movie carousel"
+    aria-roledescription="carousel"
+    tabindex="0"
+    on:pointerdown={pointerDown}
+    on:pointermove={pointerMove}
+    on:pointerup={pointerUp}
+    on:pointerleave={pointerUp}
+    on:pointercancel={pointerUp}
+    on:scroll={updateArrows}
+  >
+    {#each movies as movie}
+      <div class='card'>
+        <img src={movie.Poster != 'N/A' ? movie.Poster : '/placeholder.png'} alt={movie.Title}>
+        <div class='action-btn'>
+          <Button
+            text={mode === 'browse' ? '❤️ Add' : '❌ Remove'}
+            on:click={() => mode === 'browse' ? handleAdd(movie) : handleRemove(movie.imdbID)}
+          >
+          </Button>
+        </div>
       </div>
-    </div>
-  {/each}
+    {/each}
+  </div>
+
+  <button
+    class="arrow right"
+    on:click={() => scrollByCard('right')}
+    disabled={!canScrollRight}
+    aria-label="Scroll right"
+  >
+    ▶
+  </button>
 </div>
 
 <style>
@@ -151,13 +157,14 @@
     gap: 1rem;
     overflow-x: auto;
     scroll-behavior: smooth;
-    scroll-snap-type: x mandatory;
+    scroll-snap-type: x proximity;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     padding: 1rem;
+    padding-left: .25rem;
     scrollbar-width: none;       
-    cursor: pointer;
+    cursor: grab;
   }
   .carousel::-webkit-scrollbar {
     display: none;
@@ -182,8 +189,18 @@
     position: relative;
 
     scroll-snap-align: start;
+    user-select: none;
+    pointer-events: auto;
+
     flex: 0 0 auto;
     will-change: transform;
+  }
+  .card img {
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 2px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+
   }
   .card:hover {
     img {
@@ -220,5 +237,56 @@
     user-select: none;
     pointer-events: none;
   }
+
+
+  
+
+
+  .carousel-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .arrow {
+    position: absolute;
+    z-index: 10;
+    width: 5em;
+    height: 5em;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .carousel-wrapper .arrow {
+    opacity: 0;
+  }
+
+  .carousel-wrapper:hover .arrow {
+    opacity: 1;
+  }
+
+  .arrow:hover:not(:disabled) {
+    transform: scale(1.1);
+  }
+
+  .carousel-wrapper:hover .arrow:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .arrow.left {
+    left: 8px;
+  }
+
+  .arrow.right {
+    right: 8px;
+  }
+
 
 </style>
