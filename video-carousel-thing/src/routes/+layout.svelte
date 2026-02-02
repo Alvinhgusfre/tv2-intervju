@@ -20,6 +20,11 @@
   .container {
     margin: 0 8rem;
   }
+  @media (max-width: 600px) {
+    .container {
+      margin: 0 1rem;
+    }
+  }
   header {
     min-height: 3em;
   }

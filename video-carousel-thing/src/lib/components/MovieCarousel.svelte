@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher } from "svelte"; // Not actually deprecated
   import type { Movie } from "$lib/types/movie.js";
   import Button from "./Button.svelte";
 
-  export let query = 'Batman'
+  // export let query = 'Batman'
   export let movies: Movie[] = []
   export let mode: 'browse' | 'favourites' = 'browse'
 
@@ -27,69 +27,90 @@
 
   let isDragging = false
   let startX = 0
-  let scrollLeft = 0
+  let scrollStart = 0
+  let velocity = 0
+  let rafId = 0
 
-  function onWheel(e: WheelEvent) {
+  const friction = 1.5
+
+  function onPointerDown(e: PointerEvent) {
+    if ((e.target as HTMLElement).closest('button')) return
+    isDragging = true
+    startX = e.clientX
+    scrollStart = carousel.scrollLeft
+    velocity = 0
+
+    carousel.setPointerCapture(e.pointerId)
+    cancelAnimationFrame(rafId)
+  }
+
+  function onPointerMove(e: PointerEvent) {
+    if (!isDragging) return
+
+    const dx = e.clientX - startX
+    const prev = carousel.scrollLeft
+
+    carousel.scrollLeft = scrollStart - dx
+    velocity = carousel.scrollLeft - prev
+  }
+
+  function releasePointer(e: PointerEvent) {
+    if (!isDragging) return
+
+    isDragging = false
+
+    try {
+      carousel.releasePointerCapture(e.pointerId)
+    } catch {}
+
+    applyMomentum()
+  }
+
+  function applyMomentum() {
+    function frame() {
+      velocity *= friction
+      carousel.scrollLeft += velocity
+
+      if (Math.abs(velocity) > 0.5) {
+        rafId = requestAnimationFrame(frame)
+      } else {
+        snapToCard()
+      }
+    }
+
+    rafId = requestAnimationFrame(frame)
+  }
+
+  function snapToCard() {
+    const card = carousel.querySelector('.card') as HTMLElement
+    if (!card) return
+
+    const gap = parseFloat(getComputedStyle(carousel).gap || '0')
+    const cardWidth = card.offsetWidth + gap
+
+    const index = Math.round(carousel.scrollLeft / cardWidth)
+
+    carousel.scrollTo({
+      left: index * cardWidth,
+      behavior: 'smooth'
+    })
+  }
+
+  function onWheelNative(e: WheelEvent) {
     e.preventDefault()
     carousel.scrollLeft += e.deltaY
   }
 
-  function onMouseDown(e: MouseEvent) {
-    isDragging = true
-    startX = e.pageX - carousel.offsetLeft
-    scrollLeft = carousel.scrollLeft
+  // Attach non-passive wheel listener
+  function setupWheel(node: HTMLElement) {
+    const handler = (e: WheelEvent) => onWheelNative(e)
 
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
+    node.addEventListener('wheel', handler, { passive: false })
 
-  function onMouseMove(e: MouseEvent) {
-    if (!isDragging) return
-    const x = e.pageX - carousel.offsetLeft
-    const walk = (x - startX) * 1.5
-    carousel.scrollLeft = scrollLeft - walk
-  }
-
-  function onMouseUp() {
-    isDragging = false
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
-  }
-
-  // Touch support
-  function onTouchStart(e: TouchEvent) {
-    isDragging = true
-    startX = e.touches[0].pageX - carousel.offsetLeft
-    scrollLeft = carousel.scrollLeft
-
-    window.addEventListener('touchmove', onTouchMove)
-    window.addEventListener('touchend', onTouchEnd)
-  }
-
-  function onTouchMove(e: TouchEvent) {
-    if (!isDragging) return
-    const x = e.touches[0].pageX - carousel.offsetLeft
-    const walk = (x - startX) * 1.5
-    carousel.scrollLeft = scrollLeft - walk
-  }
-
-  function onTouchEnd() {
-    isDragging = false
-    window.removeEventListener('touchmove', onTouchMove)
-    window.removeEventListener('touchend', onTouchEnd)
-  }
- 
-  function onKeyDown(e: KeyboardEvent) {
-  const STEP = 200
-
-    if (e.key === 'ArrowRight') {
-      carousel.scrollLeft += STEP
-      e.preventDefault()
-    }
-
-    if (e.key === 'ArrowLeft') {
-      carousel.scrollLeft -= STEP
-      e.preventDefault()
+    return {
+      destroy() {
+        node.removeEventListener('wheel', handler)
+      }
     }
   }
 </script>
@@ -102,10 +123,13 @@
   aria-label="Movie carousel"
   aria-roledescription="carousel"
   tabindex="0"
-  on:wheel={onWheel}
-  on:mousedown={onMouseDown}
-  on:touchstart={onTouchStart}
-  on:keydown={onKeyDown}
+  on:pointerdown={onPointerDown}
+  on:pointermove={onPointerMove}
+  on:pointerup={releasePointer}
+  on:pointerleave={releasePointer}
+  on:pointercancel={releasePointer}
+  on:lostpointercapture={releasePointer}
+  use:setupWheel
 >
   {#each movies as movie}
     <div class='card'>
@@ -113,11 +137,7 @@
       <div class='action-btn'>
         <Button
           text={mode === 'browse' ? '❤️ Add' : '❌ Remove'}
-          on:click={() =>
-            mode === 'browse'
-              ? handleAdd(movie)
-              : handleRemove(movie.imdbID)
-          }
+          on:click={() => mode === 'browse' ? handleAdd(movie) : handleRemove(movie.imdbID)}
         >
         </Button>
       </div>
@@ -125,29 +145,28 @@
   {/each}
 </div>
 
-
-
-
 <style>
   .carousel {
     display: flex;
     gap: 1rem;
     overflow-x: auto;
-    padding: 1rem;
     scroll-behavior: smooth;
-    scrollbar-width: none;       
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
-    cursor: grab;
+    padding: 1rem;
+    scrollbar-width: none;       
+    cursor: pointer;
   }
-
+  .carousel::-webkit-scrollbar {
+    display: none;
+  }
   .carousel:focus {
     outline: 2px solid var(--color-primary);
     outline-offset: 4px;
   }
 
-  .carousel::-webkit-scrollbar {
-    display: none;
-  }
 
   .card {
     display: flex;
@@ -161,26 +180,34 @@
     flex-shrink: 0;
     user-select: none;
     position: relative;
+
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    will-change: transform;
   }
+  .card:hover {
+    img {
+      transform-origin: bottom;
+      transform: scale(1.05);
+      border: 2px solid var(--color-accent-1);
+    }
 
-
+    .action-btn {
+      visibility: visible;
+      opacity: 1;
+      transition-delay: .1s;
+    }
+  }
+  .card:focus {
+    border: 2px solid var(--color-accent-1);
+  }
   .action-btn {
     position: absolute;
     left: 10px;
     bottom: 10px;
     opacity: 0;
     transition: opacity 0.5s ease, visibility 0.5s;
-    transition-delay: 1s;
-  }
-
-  .card:hover {
-    transform: scale(1.05);
-
-    .action-btn {
-      visibility: visible;
-      opacity: 1;
-      transition-delay: .5s;
-    }
+    transition-delay: .1s;
   }
 
   img {
@@ -188,19 +215,10 @@
     max-height: 300px;
     object-fit: cover;
     border-radius: 4px;
+
+    -webkit-user-drag: none;
+    user-select: none;
+    pointer-events: none;
   }
 
-  h3 {
-    font-size: 1rem;
-    margin: 0.5rem 0 0.25rem;
-  }
-
-  p {
-    font-size: 0.8rem;
-    color: #aaa;
-  }
-
-  .error {
-    color: red;
-  }
 </style>

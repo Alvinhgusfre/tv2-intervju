@@ -1,41 +1,65 @@
 <script lang="ts">
+  import MovieCarousel from "$lib/components/MovieCarousel.svelte";
+  import { favourites } from "$lib/stores/favourites.js";
+  import { fetchRandomMovies } from "$lib/api/movies.js";
+  import type { Movie } from "$lib/types/movie.js";
+  import Button from "$lib/components/Button.svelte";
 
-import MovieCarousel from "$lib/components/MovieCarousel.svelte";
-import { favourites } from "$lib/stores/favourites.js";
-import { fetchRandomMovies } from "$lib/api/movies.js";
-import type { Movie } from "$lib/types/movie.js";
-import Button from "$lib/components/Button.svelte";
+  let randomMovies: Movie[] = []
+  let loading = true
+  let error = null
 
-let randomMovies: Movie[] = []
-let loading = true
-let error = null
+  async function loadMovies() {
+      loading = true
+      error = null
 
-async function loadMovies() {
-    loading = true
-    error = null
-
-    try {
-      const res = await fetchRandomMovies()
-      randomMovies = res.movies ?? res
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load movies'
-    } finally {
-      loading = false
+      try {
+        const res = await fetchRandomMovies()
+        randomMovies = res.movies ?? res
+      } catch (e) {
+        error = e instanceof Error ? e.message : 'Failed to load movies'
+      } finally {
+        loading = false
+      }
     }
+
+  loadMovies()
+
+  function addToFavourites(e: CustomEvent<Movie>) {
+    favourites.add(e.detail)
   }
 
-loadMovies()
+  function removeFromFavourites(e: CustomEvent<string>) {
+    favourites.remove(e.detail)
+  }
 
-function addToFavourites(e: CustomEvent<Movie>) {
-  favourites.add(e.detail)
-}
+  function printT() {
+    const inputElement = document.getElementById('t-number') as HTMLInputElement
+    let n: number = inputElement.valueAsNumber
+    if (n < 3 || n % 2 === 0) {
+      console.log('Input must be an odd number ≥ 3')
+      return
+    }
 
-function removeFromFavourites(e: CustomEvent<string>) {
-  favourites.remove(e.detail)
-}
+    const center = Math.floor(n / 2)
 
-//#100118
+    // Top row
+    console.log(Array(n).fill('T').join(' '))
+
+    // Stem
+    for (let i = 1; i < n; i++) {
+      console.log(
+        '  '.repeat(center) + 'T'
+      )
+    }
+  }
 </script>
+
+<h2>T-printer</h2>
+<div class='t-printer'>
+  <Button text='Print T' on:click={printT}></Button>
+  <input id='t-number' type='number'>
+</div>
 
 {#if loading}
   <p class='loading'>Loading...</p>
