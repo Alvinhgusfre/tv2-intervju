@@ -79,7 +79,7 @@
 
 <style>
   .carousel-slot {
-    min-height: 360px;
+    min-height: 370px;
   }
 
   input {

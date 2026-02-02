@@ -129,7 +129,13 @@
   >
     {#each movies as movie}
       <div class='card'>
-        <img src={movie.Poster != 'N/A' ? movie.Poster : '/placeholder.png'} alt={movie.Title}>
+        <div class="poster">
+          <img
+            src={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.png'}
+            alt={movie.Title}
+            loading="lazy"
+          />
+        </div>
         <div class='action-btn'>
           <Button
             text={mode === 'browse' ? '❤️ Add' : '❌ Remove'}
@@ -162,7 +168,6 @@
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     padding: 1rem;
-    padding-left: .25rem;
     scrollbar-width: none;       
     cursor: grab;
   }
@@ -195,15 +200,8 @@
     flex: 0 0 auto;
     will-change: transform;
   }
-  .card img {
-    pointer-events: none;
-    box-sizing: border-box;
-    border: 2px solid transparent;
-    transition: transform 0.2s ease, border-color 0.2s ease;
-
-  }
   .card:hover {
-    img {
+    .poster {
       transform-origin: bottom;
       transform: scale(1.05);
       border: 2px solid var(--color-accent-1);
@@ -227,11 +225,26 @@
     transition-delay: .1s;
   }
 
-  img {
+  .poster {
     width: 100%;
-    max-height: 300px;
-    object-fit: cover;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
     border-radius: 4px;
+    background: #111;
+    position: relative;
+
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 2px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform .2s ease;
 
     -webkit-user-drag: none;
     user-select: none;
@@ -239,9 +252,7 @@
   }
 
 
-  
-
-
+  /* Arrows */
   .carousel-wrapper {
     position: relative;
     display: flex;

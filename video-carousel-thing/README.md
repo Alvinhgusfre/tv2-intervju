@@ -1,6 +1,6 @@
 # Setup for testing
 
-1) Make sure you have node install and up to date
+1) Make sure you have node installed and up to date
 
 2) Run
 ```bash
