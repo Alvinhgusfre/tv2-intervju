@@ -68,7 +68,7 @@
   {:else if error}
     <p class='error'>{error}</p>
   {:else}
-    <h2>Uforsk</h2>
+    <h2>Utforsk</h2>
     <Button text='Refresh' on:click={loadMovies}></Button>
     <MovieCarousel movies={randomMovies} mode='browse' on:add={addToFavourites}></MovieCarousel>
   {/if}
